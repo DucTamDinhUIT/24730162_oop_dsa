@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>STM32F429 Typing Practice</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--tx:#0f172a;--mut:#64748b;--bd:#d6dde8;--ac:#0369a1;--code:#f1f5f9;--off:#e2e8f0;--ok:#15803d;--er:#dc2626;--wr:#b45309;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1120;--card:#1e293b;--tx:#f8fafc;--mut:#94a3b8;--bd:#334155;--ac:#38bdf8;--code:#030712;--off:#334155;--ok:#4ade80;--er:#f87171;--wr:#fbbf24}}
+:root[data-theme="dark"]{--bg:#0b1120;--card:#1e293b;--tx:#f8fafc;--mut:#94a3b8;--bd:#334155;--ac:#38bdf8;--code:#030712;--off:#334155;--ok:#4ade80;--er:#f87171;--wr:#fbbf24}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px ui-monospace,Menlo,Consolas,monospace;padding:16px}
+.w{max-width:960px;margin:0 auto;display:grid;gap:12px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+h1{font-size:18px;margin:0 0 6px;color:var(--ac)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+select,button,textarea{font:inherit;color:var(--tx);background:var(--code);border:1px solid var(--bd);border-radius:6px;padding:7px 10px}
+button{cursor:pointer;background:var(--off)}button.p{background:var(--ac);color:#fff;border:0;font-weight:700}
+textarea{width:100%;box-sizing:border-box;min-height:260px;resize:vertical;line-height:1.5;tab-size:4}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:10px;overflow-x:auto;margin:8px 0;font-size:12px;white-space:pre-wrap}
+.m{color:var(--mut);font-size:12px}.ok{color:var(--ok)}.er{color:var(--er)}.wr{color:var(--wr)}.s{font-size:20px;font-weight:700;color:var(--ac)}
+.bar{height:8px;border-radius:4px;background:var(--off);overflow:hidden}.bar i{display:block;height:100%;background:var(--ok);width:0}
+</style>
+</head>
+<body>
+<div class="w">
+<div class="c"><h1>STM32F429 Typing Practice</h1>
+<p class="m">Bản đồ thanh ghi (memory map) đã được nạp sẵn. Bạn tự gõ, trang sẽ chấm và chỉ ra chỗ sai mà không tiết lộ đáp án trừ khi bạn bấm “Xem đáp án”. Dữ liệu mẫu nhập tay, hãy đối chiếu với RM0090. Bản nháp và điểm cao nhất được lưu trong trình duyệt của bạn.</p>
+<div class="row"><select id="md" onchange="setMode()">
+<option value="0">1. Gõ struct thanh ghi (chấm offset + volatile)</option>
+<option value="1">2. Gõ #define base address + con trỏ</option>
+<option value="2">3. Gõ lại bảng offset / base từ trí nhớ</option></select>
+<select id="tg" onchange="load()"></select><span id="best" class="m"></span></div>
+<div id="task" class="m"></div></div>
+<div class="c"><textarea id="ed" spellcheck="false" oninput="save()"></textarea>
+<div class="row"><button class="p" onclick="grade()">✔ Chấm điểm</button><button onclick="hint()">💡 Gợi ý</button><button onclick="ansr()">👁 Xem đáp án</button><button onclick="reset()">↺ Làm lại</button></div></div>
+<div class="c" id="rs" style="display:none"><div class="s" id="sc"></div><div class="bar"><i id="br"></i></div><div id="ls" style="margin-top:8px"></div></div>
+<div class="c" id="hx" style="display:none"><pre id="ht"></pre></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const BUS={APB1:0x40000000,APB2:0x40010000,AHB1:0x40020000};
+const T={
+GPIO:[['MODER',0],['OTYPER',4],['OSPEEDR',8],['PUPDR',12],['IDR',16,1],['ODR',20],['BSRR',24],['LCKR',28],['AFRL',32],['AFRH',36]],
+RCC:[['CR',0],['PLLCFGR',4],['CFGR',8],['CIR',12],['AHB1RSTR',16],['AHB2RSTR',20],['AHB3RSTR',24],['APB1RSTR',32],['APB2RSTR',36],['AHB1ENR',48],['AHB2ENR',52],['AHB3ENR',56],['APB1ENR',64],['APB2ENR',68]],
+USART:[['SR',0],['DR',4],['BRR',8],['CR1',12],['CR2',16],['CR3',20],['GTPR',24]],
+SPI:[['CR1',0],['CR2',4],['SR',8,1],['DR',12],['CRCPR',16],['RXCRCR',20,1],['TXCRCR',24,1],['I2SCFGR',28],['I2SPR',32]],
+I2C:[['CR1',0],['CR2',4],['OAR1',8],['OAR2',12],['DR',16],['SR1',20],['SR2',24,1],['CCR',28],['TRISE',32],['FLTR',36]],
+EXTI:[['IMR',0],['EMR',4],['RTSR',8],['FTSR',12],['SWIER',16],['PR',20]],
+SYSCFG:[['MEMRMP',0],['PMC',4],['EXTICR1',8],['EXTICR2',12],['EXTICR3',16],['EXTICR4',20],['CMPCR',32]]};
+const I=[['GPIOA','GPIO','AHB1',0],['GPIOB','GPIO','AHB1',0x400],['GPIOG','GPIO','AHB1',0x1800],['RCC','RCC','AHB1',0x3800],['USART1','USART','APB2',0x1000],['USART2','USART','APB1',0x4400],['SPI1','SPI','APB2',0x3000],['I2C1','I2C','APB1',0x5400],['EXTI','EXTI','APB2',0x3C00],['SYSCFG','SYSCFG','APB2',0x3800]];
+const BM=[['PERIPH_BASE',0x40000000],['APB1PERIPH_BASE',0x40000000],['APB2PERIPH_BASE',0x40010000],['AHB1PERIPH_BASE',0x40020000]];
+const AL={AFR:['AFRL','AFRH'],EXTICR:['EXTICR1','EXTICR2','EXTICR3','EXTICR4']};
+const base=i=>BUS[i[2]]+i[3];
+const hx=(v,n=8)=>'0x'+(v>>>0).toString(16).toUpperCase().padStart(n,'0');
+const TG=[Object.keys(T),['Cơ bản: GPIOG, RCC, USART1','Đầy đủ: 10 ngoại vi'],Object.keys(T).map(k=>'Offset '+k).concat(['Base address các ngoại vi'])];
+const TK=['Khai báo typedef struct cho ngoại vi đã chọn: dùng __IO / __I (hoặc volatile), uint32_t, tự chèn RESERVED đúng chỗ.',
+'Gõ #define cho PERIPH_BASE, các bus base, từng NAME_BASE, và macro con trỏ kiểu #define GPIOG ((GPIO_t *)GPIOG_BASE).',
+'Không nhìn tài liệu: gõ mỗi dòng “TÊN GIÁ_TRỊ” (vd BSRR 0x18 hoặc GPIOG 0x40021800), thứ tự tùy ý.'];
+const st={g(k){try{return localStorage.getItem('stm32lab:'+k)}catch(e){return null}},s(k,v){try{localStorage.setItem('stm32lab:'+k,v)}catch(e){}}};
+const key=()=>$('md').value+':'+$('tg').value;
+const typ=()=>Object.keys(T)[+$('tg').value]||null;
+function setMode(){const m=+$('md').value;$('tg').innerHTML='';TG[m].forEach((t,k)=>{const o=document.createElement('option');o.value=k;o.textContent=t;$('tg').appendChild(o)});load()}
+function starter(){const m=+$('md').value,k=+$('tg').value;
+ if(m==0)return'typedef struct {\n    \n} '+Object.keys(T)[k]+'_t;\n';
+ if(m==1)return'#define PERIPH_BASE      \n';return''}
+function load(){const m=+$('md').value;$('task').textContent=TK[m];$('ed').value=st.g('d:'+key())??starter();$('rs').style.display='none';$('hx').style.display='none';
+ const b=st.g('b:'+key());$('best').textContent=b?'Điểm cao nhất: '+b+'%':''}
+function save(){st.s('d:'+key(),$('ed').value)}
+function reset(){$('ed').value=starter();save();$('rs').style.display='none'}
+function clean(s){return s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/\/\/.*$/gm,'')}
+function parseStruct(src){const m=clean(src).match(/\{([\s\S]*)\}/);if(!m)throw Error('Không thấy khối { ... } của struct');
+ const out=[];let off=0;
+ m[1].split(';').map(s=>s.trim()).filter(Boolean).forEach(s=>{
+  const x=s.match(/^((?:\s*(?:__IO|__I|__O|volatile|const)\b)*)\s*(uint32_t|uint16_t|uint8_t)\s+(\w+)\s*(?:\[\s*(\w+)\s*\])?$/);
+  if(!x)throw Error('Không hiểu dòng: “'+s.replace(/\s+/g,' ')+'”');
+  const q=x[1],sz={uint32_t:4,uint16_t:2,uint8_t:1}[x[2]],n=x[4]?Number(x[4]):1;
+  if(isNaN(n)||n<1)throw Error('Kích thước mảng phải là số: '+x[4]);
+  off=Math.ceil(off/sz)*sz;out.push({name:x[3],off,sz,n,vol:/__IO|__I\b|__O|volatile/.test(q),ro:/__I\b/.test(q)||(/volatile/.test(q)&&/const/.test(q))});off+=sz*n});
+ return out}
+function gStruct(){const R=T[typ()],res=[];let pts=0;const mem=parseStruct($('ed').value),map={};
+ mem.forEach(m=>{if(m.n>1&&AL[m.name])AL[m.name].forEach((nm,k)=>{if(k<m.n)map[nm]={off:m.off+k*m.sz,sz:m.sz,vol:m.vol,ro:m.ro}});else map[m.name]={off:m.off,sz:m.sz,vol:m.vol,ro:m.ro}});
+ R.forEach(r=>{const x=map[r[0]];if(!x){res.push([0,r[0]+': chưa khai báo']);return}
+  if(x.off===r[1]){pts++;res.push([1,r[0]+': offset đúng'])}else res.push([0,r[0]+': offset bạn đang có là '+hx(x.off,2)+', chưa đúng (kiểm tra padding RESERVED)']);
+  if(x.vol&&x.sz===4){pts++;res.push([1,r[0]+': kiểu/volatile đúng'])}else res.push([0,r[0]+': cần volatile và uint32_t']);
+  if(r[2]&&!x.ro)res.push([2,r[0]+': thanh ghi chỉ đọc, nên dùng __I (volatile const)'])});
+ const known=new Set(R.map(r=>r[0]));mem.forEach(m=>{if(!known.has(m.name)&&!(AL[m.name])&&!/^reserved/i.test(m.name))res.push([2,m.name+': không có trong dữ liệu mẫu, bỏ qua'])});
+ return{res,pts,max:R.length*2}}
+function gMacro(){const D={};clean($('ed').value).split('\n').forEach(l=>{const m=l.trim().match(/^#\s*define\s+(\w+)\s+(.+)$/);if(m)D[m[1]]=m[2].trim()});
+ const val=(n,d=0)=>{if(d>20)throw Error('macro tham chiếu vòng');let s=D[n];if(s===undefined)throw Error('chưa #define '+n);
+  s=s.replace(/\b[A-Za-z_]\w*\b/g,id=>/^(uint32_t|uint16_t|unsigned|int|long)$/.test(id)?'':'('+val(id,d+1)+')').replace(/\b(0[xX][0-9a-fA-F]+|\d+)[uUlL]+\b/g,'$1');
+  if(!/^[\s0-9a-fA-FxX+\-*()<>|&]+$/.test(s))throw Error('biểu thức không hợp lệ: '+D[n]);return Function('"use strict";return ('+s+')')()>>>0};
+ const list=+$('tg').value==0?I.filter(i=>['GPIOG','RCC','USART1'].includes(i[0])):I,res=[];let pts=0,max=0;
+ const chk=(n,exp)=>{max++;try{const v=val(n);if(v===exp>>>0){pts++;res.push([1,n+': đúng'])}else res.push([0,n+': giá trị bạn tính ra là '+hx(v)+', chưa đúng'])}catch(e){res.push([0,n+': '+e.message])}};
+ BM.forEach(b=>chk(b[0],b[1]));list.forEach(i=>chk(i[0]+'_BASE',base(i)));
+ list.forEach(i=>{max++;const s=D[i[0]];if(s===undefined){res.push([0,i[0]+': chưa có macro con trỏ']);return}
+  const m=s.match(/^\(\(\s*([\w\s]+?)\s*\*\s*\)\s*(\w+)\s*\)$/);if(!m){res.push([0,i[0]+': dạng đúng là ((TYPE *)ADDRESS)']);return}
+  let v;try{v=/^\d/.test(m[2])?Number(m[2].replace(/[uUlL]+$/,''))>>>0:val(m[2])}catch(e){res.push([0,i[0]+': '+e.message]);return}
+  if(v!==base(i)>>>0)res.push([0,i[0]+': con trỏ trỏ tới '+hx(v)+', chưa đúng']);else{pts++;res.push([1,i[0]+': con trỏ đúng']);if(m[1]!==i[1]+'_t')res.push([2,i[0]+': kiểu '+m[1]+' (mẫu dùng '+i[1]+'_t)'])}});
+ return{res,pts,max}}
+function gRecall(){const k=+$('tg').value,ks=Object.keys(T),ref=k<ks.length?T[ks[k]].map(r=>[r[0],r[1]]):I.map(i=>[i[0],base(i)]),got={},res=[];let pts=0;
+ $('ed').value.split('\n').forEach(l=>{const m=l.trim().match(/^([\w>.\-]+)\s*[:=\s]\s*(0[xX][0-9a-fA-F]+|\d+)/);if(m)got[m[1].replace(/^.*(->|\.)/,'').toUpperCase()]=Number(m[2])});
+ ref.forEach(r=>{const g=got[r[0].toUpperCase()];if(g===undefined)res.push([0,r[0]+': chưa gõ']);else if(g===r[1]){pts++;res.push([1,r[0]+': đúng'])}else res.push([0,r[0]+': bạn gõ '+hx(g,r[1]>0xFFFF?8:2)+', chưa đúng'])});
+ return{res,pts,max:ref.length}}
+function grade(){const m=+$('md').value;let r;try{r=[gStruct,gMacro,gRecall][m]()}catch(e){r={res:[[0,e.message]],pts:0,max:1}}
+ const p=Math.round(100*r.pts/r.max);$('rs').style.display='block';$('sc').textContent=r.pts+'/'+r.max+' điểm ('+p+'%)';$('br').style.width=p+'%';
+ $('ls').innerHTML='';r.res.sort((a,b)=>a[0]-b[0]).forEach(x=>{const d=document.createElement('div');d.className=['er','ok','wr'][x[0]];d.textContent=(['✗ ','✓ ','ℹ '][x[0]])+x[1];$('ls').appendChild(d)});
+ const b=+(st.g('b:'+key())||0);if(p>b){st.s('b:'+key(),p);$('best').textContent='Điểm cao nhất: '+p+'%'}}
+function names(){const m=+$('md').value,k=+$('tg').value,ks=Object.keys(T);
+ if(m==0){let c=0,s='Thứ tự thanh ghi (trống = cần RESERVED):\n';T[ks[k]].forEach(r=>{if(r[1]>c)s+='  [trống '+(r[1]-c)/4+' word]\n';s+='  '+r[0]+(r[2]?'  (chỉ đọc)':'')+'\n';c=r[1]+4});return s}
+ if(m==1)return'Cần: PERIPH_BASE, APB1/APB2/AHB1PERIPH_BASE, '+(k?'10':'3')+' macro NAME_BASE và macro con trỏ cùng tên ngoại vi.\nBus: APB1 từ 0x40000000, APB2 từ +0x10000, AHB1 từ +0x20000.';
+ return k<ks.length?'Thanh ghi: '+T[ks[k]].map(r=>r[0]).join(', '):'Ngoại vi: '+I.map(i=>i[0]).join(', ')}
+function hint(){$('ht').textContent=names();$('hx').style.display='block'}
+function ansr(){const m=+$('md').value,k=+$('tg').value,ks=Object.keys(T);let s='';
+ if(m==0){const n=ks[k];let c=0,j=0;s='typedef struct {\n';T[n].forEach(r=>{if(r[1]>c){const w=(r[1]-c)/4;s+='    uint32_t RESERVED'+(j++)+(w>1?'['+w+']':'')+';\n'}s+='    '+(r[2]?'__I  ':'__IO ')+'uint32_t '+r[0]+';  // '+hx(r[1],2)+'\n';c=r[1]+4});s+='} '+n+'_t;\n'}
+ else if(m==1){s='#define PERIPH_BASE      0x40000000UL\n#define APB1PERIPH_BASE  (PERIPH_BASE + 0x00000UL)\n#define APB2PERIPH_BASE  (PERIPH_BASE + 0x10000UL)\n#define AHB1PERIPH_BASE  (PERIPH_BASE + 0x20000UL)\n';
+  (k?I:I.filter(i=>['GPIOG','RCC','USART1'].includes(i[0]))).forEach(i=>{s+='#define '+i[0]+'_BASE  ('+i[2]+'PERIPH_BASE + '+hx(i[3],4)+'UL)\n#define '+i[0]+'  (('+i[1]+'_t *)'+i[0]+'_BASE)\n'})}
+ else s=(k<ks.length?T[ks[k]].map(r=>r[0]+' '+hx(r[1],2)):I.map(i=>i[0]+' '+hx(base(i)))).join('\n');
+ $('ht').textContent=s;$('hx').style.display='block'}
+setMode();
+</script>
+</body>
+</html>

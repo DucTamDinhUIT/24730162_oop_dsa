@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>STM32 Struct &amp; Memory Map Lab</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--tx:#0f172a;--mut:#64748b;--bd:#d6dde8;--ac:#0369a1;--code:#f1f5f9;--off:#e2e8f0;--ok:#15803d;--er:#dc2626;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0b1120;--card:#1e293b;--tx:#f8fafc;--mut:#94a3b8;--bd:#334155;--ac:#38bdf8;--code:#030712;--off:#334155;--ok:#4ade80;--er:#f87171}}
+:root[data-theme="dark"]{--bg:#0b1120;--card:#1e293b;--tx:#f8fafc;--mut:#94a3b8;--bd:#334155;--ac:#38bdf8;--code:#030712;--off:#334155;--ok:#4ade80;--er:#f87171}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px ui-monospace,Menlo,Consolas,monospace;padding:16px}
+.w{max-width:960px;margin:0 auto;display:grid;gap:14px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px}
+h1{font-size:18px;margin:0;color:var(--ac)}h2{font-size:15px;margin:0 0 10px;color:var(--ac)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+select,button,input{font:inherit;color:var(--tx);background:var(--code);border:1px solid var(--bd);border-radius:6px;padding:7px 10px}
+button{cursor:pointer;background:var(--off)}button.p{background:var(--ac);color:#fff;border:0;font-weight:700}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--bd);padding:5px 8px;text-align:left}th{color:var(--mut);font-weight:400}
+pre{background:var(--code);border:1px solid var(--bd);border-radius:8px;padding:10px;overflow-x:auto;margin:8px 0;font-size:12px}
+.m{color:var(--mut);font-size:12px}.ok{color:var(--ok)}.er{color:var(--er)}.b{color:var(--ac);font-weight:700}
+</style>
+</head>
+<body>
+<div class="w">
+<div class="c"><h1>STM32F429 Struct &amp; Memory Map Lab</h1>
+<p class="m">Luyện tính địa chỉ base + offset, sinh struct có padding tự động và bit-band. Offset trong bảng được nhập tay: hãy đối chiếu với bảng “Register boundary addresses” và phần mô tả thanh ghi trong RM0090.</p></div>
+
+<div class="c"><h2>1. Tra địa chỉ: base = bus + offset, thanh ghi = base + offset</h2>
+<div class="row"><select id="pi" onchange="explore()"></select><span id="bs" class="b"></span></div>
+<div class="sc"><table><thead><tr><th>Thanh ghi</th><th>Offset</th><th>Địa chỉ</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+
+<div class="c"><h2>2. Sinh struct (tự chèn padding) + _Static_assert</h2>
+<div class="row"><select id="ty" onchange="gen()"></select><button onclick="cp()">Copy</button><span id="cm" class="m"></span></div>
+<pre id="out"></pre></div>
+
+<div class="c"><h2>3. Bit-band: địa chỉ alias của một bit</h2>
+<div class="row"><select id="bp" onchange="bbReg()"></select><select id="br" onchange="bb()"></select>bit <input id="bn" type="number" min="0" max="31" value="6" style="width:70px" oninput="bb()"></div>
+<div id="bo"></div><p class="m">alias = 0x42000000 + (địa chỉ − 0x40000000) × 32 + bit × 4</p></div>
+
+<div class="c"><h2>4. Trắc nghiệm</h2>
+<div id="q" class="b"></div>
+<div class="row"><input id="a" placeholder="đáp án (hex hoặc số)" onkeydown="if(event.key=='Enter')ans()"><button class="p" onclick="ans()">Kiểm tra</button><button onclick="nq()">Câu khác</button><span id="sc" class="m"></span></div>
+<div id="fb"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const BUS={APB1:0x40000000,APB2:0x40010000,AHB1:0x40020000};
+const T={
+GPIO:[['MODER',0],['OTYPER',4],['OSPEEDR',8],['PUPDR',12],['IDR',16,1],['ODR',20],['BSRR',24],['LCKR',28],['AFRL',32],['AFRH',36]],
+RCC:[['CR',0],['PLLCFGR',4],['CFGR',8],['CIR',12],['AHB1RSTR',16],['AHB2RSTR',20],['AHB3RSTR',24],['APB1RSTR',32],['APB2RSTR',36],['AHB1ENR',48],['AHB2ENR',52],['AHB3ENR',56],['APB1ENR',64],['APB2ENR',68]],
+USART:[['SR',0],['DR',4],['BRR',8],['CR1',12],['CR2',16],['CR3',20],['GTPR',24]],
+SPI:[['CR1',0],['CR2',4],['SR',8,1],['DR',12],['CRCPR',16],['RXCRCR',20,1],['TXCRCR',24,1],['I2SCFGR',28],['I2SPR',32]],
+I2C:[['CR1',0],['CR2',4],['OAR1',8],['OAR2',12],['DR',16],['SR1',20],['SR2',24,1],['CCR',28],['TRISE',32],['FLTR',36]],
+EXTI:[['IMR',0],['EMR',4],['RTSR',8],['FTSR',12],['SWIER',16],['PR',20]],
+SYSCFG:[['MEMRMP',0],['PMC',4],['EXTICR1',8],['EXTICR2',12],['EXTICR3',16],['EXTICR4',20],['CMPCR',32]]};
+const I=[['GPIOA','GPIO','AHB1',0],['GPIOB','GPIO','AHB1',0x400],['GPIOG','GPIO','AHB1',0x1800],['RCC','RCC','AHB1',0x3800],['USART1','USART','APB2',0x1000],['USART2','USART','APB1',0x4400],['SPI1','SPI','APB2',0x3000],['I2C1','I2C','APB1',0x5400],['EXTI','EXTI','APB2',0x3C00],['SYSCFG','SYSCFG','APB2',0x3800]];
+const hx=(v,n=8)=>'0x'+(v>>>0).toString(16).toUpperCase().padStart(n,'0');
+const base=i=>BUS[i[2]]+i[3];
+const alias=(a,b)=>0x42000000+(a-0x40000000)*32+b*4;
+function fill(id,arr,f){$(id).innerHTML='';arr.forEach((x,k)=>{const o=document.createElement('option');o.value=k;o.textContent=f(x);$(id).appendChild(o)})}
+function explore(){const i=I[+$('pi').value];$('bs').textContent=i[2]+' '+hx(BUS[i[2]])+' + '+hx(i[3],4)+' = '+hx(base(i));
+ $('tb').innerHTML='';T[i[1]].forEach(r=>{const tr=document.createElement('tr');[i[0]+'->'+r[0],hx(r[1],2),hx(base(i)+r[1])].forEach(s=>{const td=document.createElement('td');td.textContent=s;tr.appendChild(td)});$('tb').appendChild(tr)})}
+function gen(){const n=$('ty').value,R=T[n];let c=0,k=0,s='typedef struct {\n';
+ R.forEach(r=>{if(r[1]>c){const w=(r[1]-c)/4;s+='    uint32_t      RESERVED'+(k++)+(w>1?'['+w+']':'')+';'.padEnd(2)+' // '+hx(c,2)+(w>1?' - '+hx(r[1]-4,2):'')+'\n'}
+  s+='    '+(r[2]?'__I  ':'__IO ')+'uint32_t '+r[0]+';'+' // '+hx(r[1],2)+'\n';c=r[1]+4});
+ s+='} '+n+'_t;\n\n';R.forEach(r=>{s+='_Static_assert(offsetof('+n+'_t, '+r[0]+') == '+hx(r[1],2)+', "'+n+' '+r[0]+' sai offset");\n'});
+ $('out').textContent=s}
+function cp(){navigator.clipboard.writeText($('out').textContent).then(()=>{$('cm').textContent='Đã copy';setTimeout(()=>$('cm').textContent='',1500)}).catch(()=>{$('cm').textContent='Không copy được, hãy bôi đen thủ công'})}
+function bbReg(){const i=I[+$('bp').value];fill('br',T[i[1]],r=>r[0]);bb()}
+function bb(){const i=I[+$('bp').value],r=T[i[1]][+$('br').value],b=Math.max(0,Math.min(31,+$('bn').value||0)),a=base(i)+r[1];
+ $('bo').textContent=i[0]+'->'+r[0]+' @ '+hx(a)+', bit '+b+'  →  alias '+hx(alias(a,b))}
+let Q,S=0,N=0;
+function nq(){const R=Math.random,pick=a=>a[Math.floor(R()*a.length)],i=pick(I),rs=T[i[1]],t=Math.floor(R()*3);
+ if(t==0){const r=pick(rs);Q={q:'Địa chỉ của '+i[0]+'->'+r[0]+' là bao nhiêu?',a:base(i)+r[1]}}
+ else if(t==1){const r=pick(rs),b=Math.floor(R()*32);Q={q:'Địa chỉ bit-band alias của bit '+b+' trong '+i[0]+'->'+r[0]+'?',a:alias(base(i)+r[1],b)}}
+ else{const g=[];for(let k=1;k<T.RCC.length;k++){const w=(T.RCC[k][1]-T.RCC[k-1][1])/4-1;if(w>0)g.push([T.RCC[k-1][0],T.RCC[k][0],w])}
+  const x=pick(g);Q={q:'Trong struct RCC_t, cần bao nhiêu word (4 byte) RESERVED giữa '+x[0]+' và '+x[1]+'?',a:x[2]}}
+ $('q').textContent=Q.q;$('a').value='';$('fb').textContent='';$('a').focus()}
+function ans(){const s=$('a').value.trim();if(!s)return;const v=/^0x/i.test(s)?parseInt(s,16):/^[0-9]+$/.test(s)&&Q.a<256?parseInt(s,10):parseInt(s,16);N++;
+ if(v===Q.a){S++;$('fb').className='ok';$('fb').textContent='✓ Đúng: '+(Q.a>255?hx(Q.a):Q.a)}else{$('fb').className='er';$('fb').textContent='✗ Sai. Đáp án: '+(Q.a>255?hx(Q.a):Q.a)}
+ $('sc').textContent='Điểm: '+S+'/'+N}
+fill('pi',I,i=>i[0]);fill('ty',Object.keys(T),k=>k);fill('bp',I,i=>i[0]);
+$('ty').innerHTML=Object.keys(T).map(k=>'<option>'+k+'</option>').join('');
+explore();gen();bbReg();nq();
+</script>
+</body>
+</html>
