@@ -11,3 +11,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 *main
+build/
+out/
+.vscode/c_cpp_properties.json
+CMakeUserPresets.json
+Thumbs.db
