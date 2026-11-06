@@ -7,5 +7,5 @@
     },
     "github.copilot.chat.agent.autoFix": false,
     "github.copilot.chat.agent.currentEditorContext.enabled": false,
-    "github.copilot.chat.anthropic.thinking.enabled": true
+    "github.copilot.chat.anthropic.thinking.enabled": true,
 }

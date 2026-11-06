@@ -2,41 +2,17 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "type": "shell",
-            "label": "C/C++: g++.exe build active file",
-            "command": "C:/msys64/ucrt64/bin/g++.exe",
-            "args": [
-                "-fdiagnostics-color=always",
-                "-g",
-                "-std=c++20",
-                "${fileDirname}\\*.cpp",
-                "-o",
-                "${fileDirname}\\${fileBasenameNoExtension}.exe"
-            ],
-            "options": {
-                "cwd": "${fileDirname}"
-            },
-            "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "detail": "Biên dịch bằng GCC UCRT64"
-        },
-        {
-            "type": "shell",
-            "label": "C/C++: clang++ build active file",
+            "type": "cppbuild",
+            "label": "C/C++: clang++ build all files in folder",
             "command": "/usr/bin/clang++",
             "args": [
                 "-std=c++20",
                 "-fcolor-diagnostics",
                 "-fansi-escape-codes",
                 "-g",
-                "*.cpp",
+                "${fileDirname}/*.cpp",
                 "-o",
-                "${fileBasenameNoExtension}"
+                "${fileDirname}/${fileBasenameNoExtension}"
             ],
             "options": {
                 "cwd": "${fileDirname}"
@@ -44,21 +20,17 @@
             "problemMatcher": [
                 "$gcc"
             ],
-            "group": {
-                "kind": "build",
-                "isDefault": false
-            },
-            "detail": "Biên dịch toàn bộ file .cpp trong thư mục trên macOS"
+            "group": "build"
         },
         {
             "type": "cppbuild",
-            "label": "C/C++: clang build active file",
-            "command": "/usr/bin/clang",
+            "label": "C/C++: clang++ build active file",
+            "command": "/usr/bin/clang++",
             "args": [
                 "-fcolor-diagnostics",
                 "-fansi-escape-codes",
                 "-g",
-                "${file}",
+                "${fileDirname}/*.cpp",
                 "-o",
                 "${fileDirname}/${fileBasenameNoExtension}"
             ],
