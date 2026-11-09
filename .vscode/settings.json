@@ -7,5 +7,13 @@
     },
     "github.copilot.chat.agent.autoFix": false,
     "github.copilot.chat.agent.currentEditorContext.enabled": false,
-    "github.copilot.chat.anthropic.thinking.enabled": true,
+    "code-runner.runInTerminal": true,
+    "code-runner.clearPreviousOutput": true,
+    "code-runner.saveFileBeforeRun": true,
+    "code-runner.executorMap": {
+        //"c": "cd $dir && mkdir -p bin && gcc $fileName -o bin/$fileNameWithoutExt && ./bin/$fileNameWithoutExt",
+        //"cpp": "cd $dir && mkdir -p bin && g++ -std=c++20 $fileName -o bin/$fileNameWithoutExt && ./bin/$fileNameWithoutExt"
+        "c": "cd $dir && mkdir -p bin && gcc *.c -o bin/$fileNameWithoutExt && ./bin/$fileNameWithoutExt",
+        "cpp": "cd $dir && mkdir -p bin && g++ -std=c++20 *.cpp -o bin/$fileNameWithoutExt && ./bin/$fileNameWithoutExt"
+    }
 }
